@@ -2,7 +2,7 @@
 
 // ---------- Config ----------
 
-const APP_VERSION = 'v4';
+const APP_VERSION = 'v5';
 const API = 'https://public.api.bsky.app/xrpc/';
 const W = 1200;
 const H = 1500;
@@ -432,13 +432,13 @@ function drawCard(person, ministry, x, y, w, h) {
   // Name
   ctx.fillStyle = '#f1f1f1';
   const name = cleanText(person.displayName) || person.handle || '';
-  const n = fitText(name, (s) => `500 ${s}px Oswald, sans-serif`, 25, 15, maxW, 1);
+  const n = fitText(name, (s) => `500 ${s}px Oswald, sans-serif`, 25, 19, maxW, 1);
   ctx.font = `500 ${n.size}px Oswald, sans-serif`;
   ctx.fillText(n.lines[0], cx, ruleY + 38);
 
   // "Party": the handle as a colored badge
   const handle = '@' + (person.handle || '').replace(/\.bsky\.social$/, '');
-  const hb = fitText(handle, (s) => `700 ${s}px Oswald, sans-serif`, 20, 12, maxW - 16, 1);
+  const hb = fitText(handle, (s) => `700 ${s}px Oswald, sans-serif`, 20, 17, maxW - 16, 1);
   ctx.font = `700 ${hb.size}px Oswald, sans-serif`;
   const bw = Math.min(maxW, ctx.measureText(hb.lines[0]).width + 20);
   const by = ruleY + 56;

@@ -2,7 +2,7 @@
 
 // ---------- Config ----------
 
-const APP_VERSION = 'v6';
+const APP_VERSION = 'v7';
 const API = 'https://public.api.bsky.app/xrpc/';
 const W = 1200;
 const H = 1500;
@@ -501,6 +501,16 @@ function renderEditor() {
   });
 }
 
+// ---------- Analytics ----------
+
+// Simple Analytics custom events. No-op if the script is blocked or not loaded yet.
+// Never send handles or names: only anonymous counts and options.
+function track(name, metadata) {
+  try {
+    if (typeof window.sa_event === 'function') window.sa_event(name, metadata);
+  } catch { /* ignore */ }
+}
+
 // ---------- Main flow ----------
 
 async function buildCabinet(handle, source) {
@@ -572,6 +582,7 @@ form.addEventListener('submit', async (e) => {
     state.ministries = cabinet.slice(0, people.length);
     setStatus(avatarSummary(people));
     showResult();
+    track('generate_poster', { source, cabinet: form.cabinet.value, people: people.length });
   } catch (err) {
     console.error(err);
     const msg = err.status === 400
@@ -594,6 +605,7 @@ $('#shuffle').addEventListener('click', () => {
 $('#download').addEventListener('click', () => {
   try {
     canvas.toBlob((blob) => {
+      track('download_poster');
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `nuevo-gobierno-${(state.me && state.me.handle) || 'bsky'}.png`;

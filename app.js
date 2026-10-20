@@ -177,15 +177,79 @@ function uniqueByDid(list) {
 
 // ---------- Images ----------
 
-function loadImage(src) {
+// cdn.bsky.app does not send CORS headers, so its images would block the PNG export.
+// Instead we fetch the original blob from the user's PDS (which allows CORS),
+// and fall back to a public image proxy that also allows it.
+
+function loadImage(src, cors = true) {
   return new Promise((resolve) => {
     if (!src) return resolve(null);
     const img = new Image();
-    img.crossOrigin = 'anonymous';   // needed so the canvas stays exportable
+    if (cors) img.crossOrigin = 'anonymous';   // keeps the canvas exportable
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
     img.src = src;
   });
+}
+
+function timeoutSignal(ms) {
+  return typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined;
+}
+
+const pdsCache = new Map();
+function pdsFor(did) {
+  if (!pdsCache.has(did)) {
+    pdsCache.set(did, (async () => {
+      const url = did.startsWith('did:web:')
+        ? `https://${did.slice(8)}/.well-known/did.json`
+        : `https://plc.directory/${did}`;
+      const res = await fetch(url, { signal: timeoutSignal(8000) });
+      if (!res.ok) throw new Error('did doc');
+      const doc = await res.json();
+      const svc = (doc.service || []).find((s) => String(s.id).endsWith('#atproto_pds'));
+      if (!svc) throw new Error('no pds');
+      return svc.serviceEndpoint.replace(/\/$/, '');
+    })());
+  }
+  return pdsCache.get(did);
+}
+
+// https://cdn.bsky.app/img/avatar/plain/<did>/<cid>@jpeg -> { did, cid }
+function parseAvatarUrl(url) {
+  const m = /\/img\/[^/]+\/[^/]+\/(did:[^/]+)\/([^/@]+)/.exec(url || '');
+  return m && { did: decodeURIComponent(m[1]), cid: m[2] };
+}
+
+async function avatarFromPds(avatarUrl) {
+  const ref = parseAvatarUrl(avatarUrl);
+  if (!ref) return null;
+  const pds = await pdsFor(ref.did);
+  const url = `${pds}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(ref.did)}&cid=${encodeURIComponent(ref.cid)}`;
+  const res = await fetch(url, { signal: timeoutSignal(10000) });
+  if (!res.ok) return null;
+  const objectUrl = URL.createObjectURL(await res.blob());
+  const img = await loadImage(objectUrl, false);
+  URL.revokeObjectURL(objectUrl);
+  return img;
+}
+
+async function loadAvatar(avatarUrl) {
+  if (!avatarUrl) return null;
+  try {
+    const img = await avatarFromPds(avatarUrl);
+    if (img) return img;
+  } catch { /* try the proxy */ }
+  const proxied = 'https://images.weserv.nl/?url=' + encodeURIComponent(avatarUrl) + '&w=500&h=500&fit=cover&output=jpg';
+  return loadImage(proxied);
+}
+
+// Canvas fonts have no emoji glyphs; strip them so names measure and center correctly.
+function cleanText(s) {
+  return String(s || '')
+    .replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}‍️⃣]/gu, '')
+    .replace(/[①-⓿☀-➿\u{1F000}-\u{1FAFF}]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 // ---------- Drawing ----------
@@ -309,7 +373,7 @@ function drawPhoto(person, x, y, w, h) {
     ctx.font = `${Math.round(h * 0.45)}px Anton, Oswald, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const initial = (person.displayName || person.handle || '?').trim().charAt(0).toUpperCase();
+    const initial = [...(cleanText(person.displayName) || person.handle || '?')][0].toUpperCase();
     ctx.fillText(initial, x + w / 2, y + h / 2 + 4);
   }
   // Soft shadow at the bottom of the photo
@@ -351,7 +415,7 @@ function drawCard(person, ministry, x, y, w, h) {
 
   // Name
   ctx.fillStyle = '#f1f1f1';
-  const name = (person.displayName || person.handle || '').trim();
+  const name = cleanText(person.displayName) || person.handle || '';
   const n = fitText(name, (s) => `500 ${s}px Oswald, sans-serif`, 25, 15, maxW, 1);
   ctx.font = `500 ${n.size}px Oswald, sans-serif`;
   ctx.fillText(n.lines[0], cx, ruleY + 38);
@@ -445,7 +509,7 @@ async function buildCabinet(handle, source) {
 
 async function attachImages(people) {
   setStatus('Descargando avatares…');
-  await Promise.all(people.map(async (p) => { p.img = await loadImage(p.avatar); }));
+  await Promise.all(people.map(async (p) => { p.img = await loadAvatar(p.avatar); }));
 }
 
 async function ensureFonts() {

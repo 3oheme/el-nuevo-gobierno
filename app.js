@@ -2,7 +2,7 @@
 
 // ---------- Config ----------
 
-const APP_VERSION = 'v5';
+const APP_VERSION = 'v6';
 const API = 'https://public.api.bsky.app/xrpc/';
 const W = 1200;
 const H = 1500;

@@ -2,7 +2,7 @@
 
 // ---------- Config ----------
 
-const APP_VERSION = 'v3';
+const APP_VERSION = 'v4';
 const API = 'https://public.api.bsky.app/xrpc/';
 const W = 1200;
 const H = 1500;
@@ -262,8 +262,8 @@ async function loadAvatar(person) {
 // Canvas fonts have no emoji glyphs; strip them so names measure and center correctly.
 function cleanText(s) {
   return String(s || '')
-    .replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}‍️⃣]/gu, '')
-    .replace(/[①-⓿☀-➿\u{1F000}-\u{1FAFF}]/gu, '')
+    .normalize('NFC')
+    .replace(/[^\p{L}\p{M}\p{N}\p{P}\p{Zs}&+=$€%°|]/gu, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -325,19 +325,19 @@ function drawHeader(title, subtitle) {
     size -= 4;
     ctx.font = `${size}px Anton, Oswald, Impact, sans-serif`;
   }
-  ctx.fillText(title, W / 2 + 40, 170);
+  ctx.fillText(title, W / 2, 170);
 
   ctx.shadowBlur = 0;
   ctx.font = '600 50px Oswald, sans-serif';
   ctx.letterSpacing = '8px';
   const tw = ctx.measureText(subtitle).width;
-  ctx.fillText(subtitle, W / 2 + 40, 248);
+  ctx.fillText(subtitle, W / 2, 248);
   ctx.letterSpacing = '0px';
 
   ctx.fillStyle = '#d72631';
   const lineW = 150, gap = 26, cy = 232;
-  ctx.fillRect(W / 2 + 40 - tw / 2 - gap - lineW, cy, lineW, 5);
-  ctx.fillRect(W / 2 + 40 + tw / 2 + gap, cy, lineW, 5);
+  ctx.fillRect(W / 2 - tw / 2 - gap - lineW, cy, lineW, 5);
+  ctx.fillRect(W / 2 + tw / 2 + gap, cy, lineW, 5);
   ctx.restore();
 }
 
@@ -460,6 +460,7 @@ function roundRect(x, y, w, h, r) {
 }
 
 function render() {
+  ctx.direction = 'ltr';
   const n = state.people.length;
   drawBackground();
   drawHeader('EL NUEVO GOBIERNO', `LOS ${n} MINISTROS`);

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>El Nuevo Gobierno</title>
+  <meta name="description" content="Forma tu gobierno con tus contactos de Bluesky y descarga el cartel.">
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header class="intro">
+      <h1>El Nuevo Gobierno</h1>
+      <p>Escribe tu usuario y te montamos el gabinete con la gente con la que más interactúas. Todo pasa en tu navegador.</p>
+    </header>
+
+    <form id="form" class="panel" autocomplete="off">
+      <div class="networks" role="radiogroup" aria-label="Red social">
+        <label><input type="radio" name="network" value="bluesky" checked> Bluesky</label>
+        <label class="soon" title="Próximamente"><input type="radio" name="network" value="twitter" disabled> X / Twitter</label>
+        <label class="soon" title="Próximamente"><input type="radio" name="network" value="instagram" disabled> Instagram</label>
+      </div>
+
+      <label class="field">
+        <span>Tu usuario</span>
+        <input id="handle" name="handle" type="text" placeholder="tunombre.bsky.social" required autocapitalize="off" spellcheck="false">
+      </label>
+
+      <fieldset class="field">
+        <legend>¿A quién nombramos?</legend>
+        <label><input type="radio" name="source" value="interactions" checked> Con quien más interactúo</label>
+        <label><input type="radio" name="source" value="follows"> Gente a la que sigo (al azar)</label>
+      </fieldset>
+
+      <fieldset class="field">
+        <legend>Ministerios</legend>
+        <label><input type="radio" name="cabinet" value="serio" checked> Serios</label>
+        <label><input type="radio" name="cabinet" value="internet"> De internet</label>
+      </fieldset>
+
+      <button type="submit" id="go">Formar gobierno</button>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </form>
+
+    <section id="result" class="result" hidden>
+      <canvas id="poster" width="1200" height="1500"></canvas>
+      <div class="actions">
+        <button id="download" type="button">Descargar imagen</button>
+        <button id="shuffle" type="button" class="secondary">Barajar carteras</button>
+      </div>
+      <details class="panel editor">
+        <summary>Editar nombres y carteras</summary>
+        <ol id="slots"></ol>
+      </details>
+    </section>
+
+    <footer class="foot">
+      <p>Usa la API pública de Bluesky, sin login. No guardamos nada. Parodia, no afiliada a ningún partido.</p>
+    </footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

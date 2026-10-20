@@ -2,6 +2,7 @@
 
 // ---------- Config ----------
 
+const APP_VERSION = 'v3';
 const API = 'https://public.api.bsky.app/xrpc/';
 const W = 1200;
 const H = 1500;
@@ -204,7 +205,7 @@ function pdsFor(did) {
         ? `https://${did.slice(8)}/.well-known/did.json`
         : `https://plc.directory/${did}`;
       const res = await fetch(url, { signal: timeoutSignal(8000) });
-      if (!res.ok) throw new Error('did doc');
+      if (!res.ok) throw new Error('did doc HTTP ' + res.status);
       const doc = await res.json();
       const svc = (doc.service || []).find((s) => String(s.id).endsWith('#atproto_pds'));
       if (!svc) throw new Error('no pds');
@@ -226,21 +227,36 @@ async function avatarFromPds(avatarUrl) {
   const pds = await pdsFor(ref.did);
   const url = `${pds}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(ref.did)}&cid=${encodeURIComponent(ref.cid)}`;
   const res = await fetch(url, { signal: timeoutSignal(10000) });
-  if (!res.ok) return null;
+  if (!res.ok) throw new Error('getBlob HTTP ' + res.status);
   const objectUrl = URL.createObjectURL(await res.blob());
   const img = await loadImage(objectUrl, false);
   URL.revokeObjectURL(objectUrl);
+  if (!img) throw new Error('no se pudo decodificar');
   return img;
 }
 
-async function loadAvatar(avatarUrl) {
-  if (!avatarUrl) return null;
+// Tries several sources and records why each one failed, so the status line can explain it.
+async function loadAvatar(person) {
+  const url = person.avatar;
+  person.avatarLog = [];
+  if (!url) { person.avatarLog.push('sin avatar'); return null; }
+
+  let img = await loadImage(url);
+  if (img) { person.avatarVia = 'cdn'; return img; }
+  person.avatarLog.push('cdn: bloqueado');
+
   try {
-    const img = await avatarFromPds(avatarUrl);
-    if (img) return img;
-  } catch { /* try the proxy */ }
-  const proxied = 'https://images.weserv.nl/?url=' + encodeURIComponent(avatarUrl) + '&w=500&h=500&fit=cover&output=jpg';
-  return loadImage(proxied);
+    img = await avatarFromPds(url);
+    if (img) { person.avatarVia = 'pds'; return img; }
+    person.avatarLog.push('pds: sin imagen');
+  } catch (err) {
+    person.avatarLog.push('pds: ' + (err && err.message ? err.message : err));
+  }
+
+  img = await loadImage('https://wsrv.nl/?url=' + encodeURIComponent(url) + '&w=500&h=500&fit=cover&output=jpg');
+  if (img) { person.avatarVia = 'proxy'; return img; }
+  person.avatarLog.push('proxy: falló');
+  return null;
 }
 
 // Canvas fonts have no emoji glyphs; strip them so names measure and center correctly.
@@ -509,7 +525,15 @@ async function buildCabinet(handle, source) {
 
 async function attachImages(people) {
   setStatus('Descargando avatares…');
-  await Promise.all(people.map(async (p) => { p.img = await loadAvatar(p.avatar); }));
+  await Promise.all(people.map(async (p) => { p.img = await loadAvatar(p); }));
+}
+
+function avatarSummary(people) {
+  const count = (via) => people.filter((p) => p.avatarVia === via).length;
+  const failed = people.filter((p) => !p.img);
+  let msg = `Listo (${APP_VERSION}). Avatares: ${count('cdn')} cdn, ${count('pds')} pds, ${count('proxy')} proxy, ${failed.length} sin imagen.`;
+  if (failed.length) msg += ` Ejemplo de fallo (@${failed[0].handle}): ${failed[0].avatarLog.join(' · ')}`;
+  return msg;
 }
 
 async function ensureFonts() {
@@ -545,8 +569,7 @@ form.addEventListener('submit', async (e) => {
     state.me = people[0];
     state.people = people;
     state.ministries = cabinet.slice(0, people.length);
-    const missing = people.filter((p) => !p.img).length;
-    setStatus(missing ? `Listo. ${missing} avatar(es) no se pudieron cargar y llevan inicial.` : 'Listo.');
+    setStatus(avatarSummary(people));
     showResult();
   } catch (err) {
     console.error(err);
